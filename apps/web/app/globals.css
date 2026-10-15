@@ -2,14 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Phase 0 baseline only. The editorial design system (colour tokens, fonts,
-   radius from AGENTS.md section 10.2) is introduced in Phase 5 via
-   styles/tokens.css. */
+/* Design tokens (AGENTS.md section 10.2). This is carry-forward work: the real
+   build reuses these tokens; only the (proto) pages are throwaway. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --ink: #1c1c1e;
+  --muted: #6b6b70;
+  --border: #e7e3dc;
+  --accent: #2f4b8f;
+
+  /* Evidence status (deliberately not red/green) */
+  --status-checked: #3558a8;
+  --status-evidence: #1f7a6d;
+  --status-insufficient: #b7791f;
+
+  /* Stance */
+  --stance-supports: #1f7a6d;
+  --stance-contradicts: #b23a48;
+  --stance-context: #64748b;
+
+  --radius: 10px;
 }
 
-body {
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+.dark {
+  color-scheme: dark;
+  --bg: #111214;
+  --surface: #1a1b1e;
+  --ink: #eceae6;
+  --muted: #9a9aa1;
+  --border: #2a2b30;
+  --accent: #8fa8e8;
+
+  --status-checked: #7f9ce0;
+  --status-evidence: #4fb3a2;
+  --status-insufficient: #d9a441;
+
+  --stance-supports: #4fb3a2;
+  --stance-contradicts: #e07a86;
+  --stance-context: #9aa7b8;
+}
+
+@layer base {
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+  /* Devanagari (Hindi/Marathi) needs a taller line box. */
+  :lang(hi),
+  :lang(mr) {
+    font-family: var(--font-deva), var(--font-sans), sans-serif;
+    line-height: 1.65;
+  }
 }

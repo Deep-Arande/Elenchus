@@ -91,6 +91,20 @@ class Settings(BaseSettings):
         """Parsed, lowercased admin emails from the comma-separated env var."""
         return [e.strip().lower() for e in self.admin_emails.split(",") if e.strip()]
 
+    # --- Prototype (vertical slice) helpers ---
+    # The throwaway prototype runs on deterministic mock data whenever the
+    # corresponding key is absent, so the whole flow is demoable without any
+    # credentials. These are prototype-only conveniences.
+    @property
+    def llm_mock(self) -> bool:
+        """True when Gemini is not configured — the prototype falls back to mocks."""
+        return not self.gemini_api_key
+
+    @property
+    def search_mock(self) -> bool:
+        """True when Firecrawl is not configured — the prototype falls back to mocks."""
+        return not self.firecrawl_api_key
+
 
 @lru_cache
 def get_settings() -> Settings:
