@@ -1,0 +1,5 @@
+-- Supabase seed data.
+--
+-- Phase 0: empty. Phase 4 seeds the system source presets (Indian government,
+-- Fact-checkers, Wire services & national media, Science & health) as editable
+-- defaults (AGENTS.md section 7.3, 10.4 item 8).

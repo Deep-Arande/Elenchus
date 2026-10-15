@@ -1,0 +1,66 @@
+# Fact-checker sites for the ClaimReview crawler (AGENTS.md section 7.2).
+#
+# Each entry: name, homepage, rss_or_sitemap (feed to discover article URLs),
+# language, enabled.
+#
+# IMPORTANT: these feed URLs are best-effort and MUST be verified live on first
+# run (BUILD_PROMPTS Phase 1). Set `enabled: false` for any feed that 404s or
+# lacks ClaimReview markup, and record it in docs/DECISIONS.md. Respect each
+# site's robots.txt (the crawler does this automatically).
+
+sources:
+  # --- Indian fact-checkers ---
+  - name: BOOM
+    homepage: https://www.boomlive.in
+    rss_or_sitemap: https://www.boomlive.in/sitemap.xml
+    language: multi
+    enabled: true
+
+  - name: Alt News
+    homepage: https://www.altnews.in
+    rss_or_sitemap: https://www.altnews.in/sitemap.xml
+    language: multi
+    enabled: true
+
+  - name: Factly
+    homepage: https://factly.in
+    rss_or_sitemap: https://factly.in/sitemap.xml
+    language: en
+    enabled: true
+
+  - name: Vishvas News
+    homepage: https://www.vishvasnews.com
+    rss_or_sitemap: https://www.vishvasnews.com/sitemap.xml
+    language: multi
+    enabled: true
+
+  - name: The Quint WebQoof
+    homepage: https://www.thequint.com
+    rss_or_sitemap: https://www.thequint.com/sitemap.xml
+    language: en
+    enabled: true
+
+  - name: Fact Crescendo
+    homepage: https://www.factcrescendo.com
+    rss_or_sitemap: https://www.factcrescendo.com/sitemap.xml
+    language: multi
+    enabled: true
+
+  - name: Newschecker
+    homepage: https://newschecker.in
+    rss_or_sitemap: https://newschecker.in/sitemap.xml
+    language: multi
+    enabled: true
+
+  # --- International (a few, for coverage of global viral claims) ---
+  - name: AFP Fact Check
+    homepage: https://factcheck.afp.com
+    rss_or_sitemap: https://factcheck.afp.com/sitemap.xml
+    language: multi
+    enabled: true
+
+  - name: Full Fact
+    homepage: https://fullfact.org
+    rss_or_sitemap: https://fullfact.org/sitemap.xml
+    language: en
+    enabled: true

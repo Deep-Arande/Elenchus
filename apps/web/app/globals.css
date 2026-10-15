@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Phase 0 baseline only. The editorial design system (colour tokens, fonts,
+   radius from AGENTS.md section 10.2) is introduced in Phase 5 via
+   styles/tokens.css. */
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
