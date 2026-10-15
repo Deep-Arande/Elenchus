@@ -56,10 +56,12 @@ Do not swap any of these without asking. Do not add dependencies outside this li
 - **Memory:** LangMem on LangGraph's Postgres store, wrapped in our own pending → approved flow (section 9).
 - **Database:** Supabase Postgres with `pgvector` and `pg_trgm`. Python access via SQLAlchemy 2.0 (async) with psycopg 3. Schema migrations are SQL files in `supabase/migrations/`.
 - **Embeddings:** configurable `EMBEDDING_BACKEND`:
-  - `bge-m3` (default): BAAI/bge-m3 via FlagEmbedding or sentence-transformers, 1024 dims, run locally
-  - `gemini`: Gemini embedding model, dimension set in config
-  - Never mix models in one index. Every vector row stores `model` and `dim`. Changing backend requires a re-index command.
-- **Reranker:** `BAAI/bge-reranker-v2-m3` locally (`RERANKER_BACKEND=local`), fallback `RERANKER_BACKEND=llm` (Gemini Flash-Lite scoring).
+  - `gemini` (default): Gemini embedding model via the `google-genai` SDK, dimension set in config (`GEMINI_EMBEDDING_MODEL` + `EMBEDDING_DIM`). Chosen as the V1 default so the api/worker run on small hosted instances with no multi-GB model loaded; cost is per embedding call and counts against the per-check budget.
+  - `bge-m3`: BAAI/bge-m3 via FlagEmbedding or sentence-transformers, 1024 dims, run locally. Free per request and private, but needs a ~2GB+ instance; use only when self-hosting on adequate hardware.
+  - Never mix models in one index. Every vector row stores `model` and `dim`. Changing backend requires a re-index command. **Develop and tune on the same backend you deploy** — switching after tuning forces a full corpus re-index and may shift `MATCH_THRESHOLD` and eval numbers.
+- **Reranker:** configurable `RERANKER_BACKEND`:
+  - `llm` (default): Gemini Flash-Lite scoring. Chosen with the Gemini embeddings default so the api/worker carry no multi-GB local model; cost is per rerank call and counts against the per-check budget.
+  - `local`: `BAAI/bge-reranker-v2-m3` run locally. Free per request and private, but needs a ~2GB+ instance; use only when self-hosting on adequate hardware.
 - **Keyword search:** Postgres full-text with the `simple` configuration (no stemming, works for Devanagari) plus `pg_trgm` similarity for Hinglish and spelling variants.
 - **Web search and scraping:** Firecrawl (`firecrawl-py`) as the primary provider. Brave and Exa adapters are implemented but disabled unless keys are present.
 - **Page extraction fallback:** `httpx` + `trafilatura`
@@ -377,9 +379,10 @@ EXA_API_KEY=                # optional
 GOOGLE_FACTCHECK_API_KEY=
 
 # Retrieval
-EMBEDDING_BACKEND=bge-m3    # bge-m3 | gemini
-GEMINI_EMBEDDING_MODEL=
-RERANKER_BACKEND=local      # local | llm
+EMBEDDING_BACKEND=gemini    # gemini (default) | bge-m3
+GEMINI_EMBEDDING_MODEL=     # current Gemini embedding model id
+EMBEDDING_DIM=              # output dimension for the Gemini embedding model
+RERANKER_BACKEND=llm        # llm (default) | local
 MATCH_THRESHOLD=0.75
 SIMILAR_CLAIM_THRESHOLD=0.85
 
