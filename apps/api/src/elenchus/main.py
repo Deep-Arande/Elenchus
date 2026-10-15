@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from elenchus.build_info import VERSION
 from elenchus.config import Settings, get_settings
+from elenchus.proto.router import router as proto_router
 from elenchus.routers import health
 
 
@@ -39,6 +40,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.include_router(health.router)
+    # Prototype (vertical slice) — throwaway, quarantined under /proto.
+    # Delete this line and the elenchus.proto package to remove the prototype.
+    app.include_router(proto_router)
 
     return app
 
