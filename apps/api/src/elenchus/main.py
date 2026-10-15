@@ -1,0 +1,46 @@
+"""FastAPI application factory.
+
+Keep this thin: it wires configuration, middleware and routers together.
+Business logic lives in the feature packages (AGENTS.md section 4).
+"""
+
+from __future__ import annotations
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from elenchus.build_info import VERSION
+from elenchus.config import Settings, get_settings
+from elenchus.routers import health
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    """Build and return the FastAPI app.
+
+    Accepts an optional ``settings`` override so tests can inject config without
+    touching the environment.
+    """
+    settings = settings or get_settings()
+
+    app = FastAPI(
+        title="Elenchus API",
+        version=VERSION,
+        summary="Evidence, not verdicts — a personal fact-checking workspace.",
+    )
+
+    # CORS: in Phase 0 we allow the local web app; Phase 9 locks this to the
+    # deployed app domain.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[settings.app_base_url],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(health.router)
+
+    return app
+
+
+app = create_app()

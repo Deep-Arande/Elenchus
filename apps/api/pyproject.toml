@@ -1,0 +1,85 @@
+[project]
+name = "elenchus"
+version = "0.1.0"
+description = "Elenchus — a personal fact-checking workspace for Indian users (evidence, not verdicts)."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "arq>=0.26",
+    "redis>=5.2",
+    "langfuse>=2.53",
+    # --- Phase 1: database + corpus ingestion ---
+    "sqlalchemy[asyncio]>=2.0.36",
+    "psycopg[binary]>=3.2",
+    "pgvector>=0.3.6",
+    "alembic>=1.14",
+    "httpx>=0.27",
+    "extruct>=0.17",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+elenchus-export-openapi = "elenchus.scripts.export_openapi:main"
+elenchus-ingest = "elenchus.ingest.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.7",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/elenchus"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "evals"]
+
+[tool.ruff.lint]
+# Conservative, portfolio-grade default: pyflakes, pycodestyle, isort, bugbear, pyupgrade.
+select = ["E", "F", "I", "B", "UP", "W"]
+ignore = ["E501"]  # line length handled by the formatter
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+# Baseline: lenient repo-wide so placeholder modules don't block CI.
+ignore_missing_imports = true
+
+# Strict modules per AGENTS.md section 3 (agent/, retrieval/, search/).
+# These packages are placeholders in Phase 0; the strict gate is wired now so it
+# bites as soon as real code lands.
+[[tool.mypy.overrides]]
+module = [
+    "elenchus.agent.*",
+    "elenchus.retrieval.*",
+    "elenchus.search.*",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_any_generics = true
+warn_return_any = true
+no_implicit_reexport = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"

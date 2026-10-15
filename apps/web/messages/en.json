@@ -1,0 +1,9 @@
+{
+  "home": {
+    "title": "Elenchus",
+    "tagline": "Evidence, not verdicts.",
+    "subtitle": "A personal fact-checking workspace. It surfaces evidence from sources you trust — it never labels a claim true or fake.",
+    "scaffoldNotice": "Phase 0 scaffold. The product is built phase by phase; see docs/PROGRESS.md.",
+    "disclaimer": "Elenchus is a research demo. It surfaces evidence; it does not give verdicts. Always read the sources."
+  }
+}
