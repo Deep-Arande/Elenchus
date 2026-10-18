@@ -15,13 +15,68 @@ verifies exact parameter names against the official docs.
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
+from collections.abc import Callable
 from functools import lru_cache
+from typing import Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
 from elenchus.config import get_settings
+
+logger = logging.getLogger("elenchus.proto.search")
+
+FIRECRAWL_TIMEOUT = 20.0  # seconds per Firecrawl call
+FIRECRAWL_ATTEMPTS = 3  # total tries for transient failures
+
+Reason = Literal["auth", "quota", "rate_limited", "timeout", "server", "network", "unknown"]
+# Reasons worth retrying (transient). auth/quota are not — retrying won't help.
+_RETRYABLE: set[Reason] = {"rate_limited", "server", "timeout", "network"}
+
+_FRIENDLY: dict[Reason, str] = {
+    "auth": "invalid or missing Firecrawl API key",
+    "quota": "Firecrawl quota/credits exhausted",
+    "rate_limited": "Firecrawl rate limit hit",
+    "timeout": "Firecrawl request timed out",
+    "server": "Firecrawl service error",
+    "network": "could not reach Firecrawl",
+    "unknown": "search provider error",
+}
+
+
+class SearchError(Exception):
+    """A classified Firecrawl failure the pipeline can turn into a trace warning."""
+
+    def __init__(self, reason: Reason, detail: str = "") -> None:
+        self.reason: Reason = reason
+        self.detail = detail
+        super().__init__(f"{_FRIENDLY[reason]}" + (f": {detail}" if detail else ""))
+
+    @property
+    def friendly(self) -> str:
+        return _FRIENDLY[self.reason]
+
+
+def _classify(exc: BaseException) -> Reason:
+    """Map a raw Firecrawl/transport exception to a Reason."""
+    if isinstance(exc, asyncio.TimeoutError):
+        return "timeout"
+    text = str(exc).lower()
+    if any(k in text for k in ("unauthorized", "invalid token", "401", "forbidden", "403")):
+        return "auth"
+    if any(k in text for k in ("payment", "quota", "credit", "402", "insufficient")):
+        return "quota"
+    if any(k in text for k in ("rate limit", "429", "too many requests")):
+        return "rate_limited"
+    if any(k in text for k in ("timeout", "timed out", "deadline")):
+        return "timeout"
+    if any(k in text for k in ("500", "502", "503", "504", "server error", "unavailable")):
+        return "server"
+    if any(k in text for k in ("connection", "network", "resolve", "dns", "ssl", "econn")):
+        return "network"
+    return "unknown"
 
 
 class SearchHit(BaseModel):
@@ -46,17 +101,21 @@ def _slug(text: str) -> str:
 
 
 async def search(query: str, *, limit: int = 3) -> list[SearchHit]:
-    settings = get_settings()
-    if settings.search_mock:
+    """Search the web. Raises SearchError on a classified provider failure."""
+    if get_settings().search_mock:
         return _mock_search(query, limit)
-    return await _firecrawl_search(query, limit)
+    hits = await _firecrawl_search(query, limit)
+    logger.info("search ok: %d hit(s) for %r", len(hits), query[:80])
+    return hits
 
 
 async def fetch(url: str) -> str:
-    settings = get_settings()
-    if settings.search_mock:
+    """Fetch a page as text. Raises SearchError on a classified provider failure."""
+    if get_settings().search_mock:
         return _MOCK_PAGES.get(url, f"No cached content for {url}.")
-    return await _firecrawl_fetch(url)
+    text = await _firecrawl_fetch(url)
+    logger.info("fetch ok: %d chars from %s", len(text), url)
+    return text
 
 
 # --------------------------------------------------------------------------- #
@@ -69,8 +128,37 @@ def _fc():  # cached Firecrawl v4 client
     return Firecrawl(api_key=get_settings().firecrawl_api_key)
 
 
+async def _call(op: str, fn: Callable[[], object]) -> object:
+    """Run a blocking Firecrawl call with a timeout + retry on transient errors.
+
+    Raises SearchError (classified) when it ultimately fails.
+    """
+    last: Reason = "unknown"
+    detail = ""
+    for attempt in range(FIRECRAWL_ATTEMPTS):
+        try:
+            return await asyncio.wait_for(asyncio.to_thread(fn), timeout=FIRECRAWL_TIMEOUT)
+        except Exception as exc:  # noqa: BLE001 - classified and re-raised below
+            last = _classify(exc)
+            detail = str(exc)[:200]
+            if last not in _RETRYABLE or attempt == FIRECRAWL_ATTEMPTS - 1:
+                logger.warning("firecrawl %s failed (%s): %s", op, last, detail)
+                raise SearchError(last, detail) from exc
+            wait = 0.8 * (2**attempt)
+            logger.info(
+                "firecrawl %s transient (%s), retry %d/%d in %.1fs",
+                op,
+                last,
+                attempt + 1,
+                FIRECRAWL_ATTEMPTS,
+                wait,
+            )
+            await asyncio.sleep(wait)
+    raise SearchError(last, detail)
+
+
 async def _firecrawl_search(query: str, limit: int) -> list[SearchHit]:
-    data = await asyncio.to_thread(lambda: _fc().search(query, limit=limit))
+    data = await _call("search", lambda: _fc().search(query, limit=limit))
     web = getattr(data, "web", None) or []
     hits: list[SearchHit] = []
     for item in list(web)[:limit]:
@@ -89,7 +177,7 @@ async def _firecrawl_search(query: str, limit: int) -> list[SearchHit]:
 
 
 async def _firecrawl_fetch(url: str) -> str:
-    doc = await asyncio.to_thread(lambda: _fc().scrape(url, formats=["markdown"]))
+    doc = await _call("scrape", lambda: _fc().scrape(url, formats=["markdown"]))
     return getattr(doc, "markdown", None) or getattr(doc, "html", None) or ""
 
 

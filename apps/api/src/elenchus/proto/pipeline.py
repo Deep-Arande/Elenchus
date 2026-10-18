@@ -100,7 +100,18 @@ async def _run_claim(check: CheckState, claim: Claim, bus: EventBus) -> None:
     seen_urls: set[str] = set()
     for query in _plan_queries(claim):
         await bus.emit("query", {"claim_id": claim.id, "query": query})
-        hits = await search.search(query, limit=MAX_PAGES_PER_CLAIM)
+        try:
+            hits = await search.search(query, limit=MAX_PAGES_PER_CLAIM)
+        except search.SearchError as exc:
+            await bus.emit(
+                "warning",
+                {
+                    "claim_id": claim.id,
+                    "reason": exc.reason,
+                    "message": f"Search unavailable — {exc.friendly}.",
+                },
+            )
+            continue
         await bus.emit(
             "search_results",
             {"claim_id": claim.id, "hits": [h.model_dump() for h in hits]},
@@ -149,7 +160,19 @@ async def _read_source(
         "page_fetched",
         {"claim_id": claim.id, "source_id": source_id, "url": hit.url, "title": hit.title},
     )
-    page_text = await search.fetch(hit.url)
+    try:
+        page_text = await search.fetch(hit.url)
+    except search.SearchError as exc:
+        await bus.emit(
+            "warning",
+            {
+                "claim_id": claim.id,
+                "source_id": source_id,
+                "reason": exc.reason,
+                "message": f"Could not read {hit.domain or hit.url} — {exc.friendly}.",
+            },
+        )
+        return
     for stance, quote, relevance in await llm.extract_evidence(
         claim.text_original, source_id, page_text
     ):

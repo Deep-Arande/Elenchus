@@ -10,7 +10,9 @@ import {
 } from "lucide-react";
 import type { ProtoEvent } from "@/lib/proto";
 
-function describe(ev: ProtoEvent): { icon: React.ReactNode; text: string; strong?: boolean } | null {
+type Row = { icon: React.ReactNode; text: string; strong?: boolean; tone?: "warn" | "error" };
+
+function describe(ev: ProtoEvent): Row | null {
   const p = ev.payload;
   switch (ev.type) {
     case "step_started":
@@ -35,12 +37,18 @@ function describe(ev: ProtoEvent): { icon: React.ReactNode; text: string; strong
         strong: true,
       };
     case "warning":
+      return { icon: <AlertTriangle size={15} />, text: String(p.message ?? "warning"), tone: "warn" };
     case "error":
-      return { icon: <AlertTriangle size={15} />, text: String(p.message ?? ev.type) };
+      return { icon: <AlertTriangle size={15} />, text: String(p.message ?? "error"), tone: "error" };
     default:
       return null;
   }
 }
+
+const TONE_COLOR: Record<"warn" | "error", string> = {
+  warn: "var(--status-insufficient)",
+  error: "var(--stance-contradicts)",
+};
 
 export function TraceTimeline({ events }: { events: ProtoEvent[] }) {
   const rows = events.map((ev) => ({ ev, d: describe(ev) })).filter((r) => r.d !== null);
@@ -49,16 +57,26 @@ export function TraceTimeline({ events }: { events: ProtoEvent[] }) {
   }
   return (
     <ol className="relative space-y-3 border-l border-border pl-5">
-      {rows.map(({ ev, d }) => (
-        <li key={ev.seq} className="relative">
-          <span className="absolute -left-[26px] flex h-5 w-5 items-center justify-center rounded-full bg-surface text-muted ring-1 ring-border">
-            {d!.icon}
-          </span>
-          <p className={d!.strong ? "text-sm font-medium text-ink" : "text-sm text-muted"}>
-            {d!.text}
-          </p>
-        </li>
-      ))}
+      {rows.map(({ ev, d }) => {
+        const tone = d!.tone;
+        const color = tone ? TONE_COLOR[tone] : undefined;
+        return (
+          <li key={ev.seq} className="relative">
+            <span
+              className="absolute -left-[26px] flex h-5 w-5 items-center justify-center rounded-full bg-surface ring-1 ring-border"
+              style={{ color: color ?? "var(--muted)" }}
+            >
+              {d!.icon}
+            </span>
+            <p
+              className={d!.strong ? "text-sm font-medium text-ink" : "text-sm text-muted"}
+              style={color ? { color } : undefined}
+            >
+              {d!.text}
+            </p>
+          </li>
+        );
+      })}
     </ol>
   );
 }
