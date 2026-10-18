@@ -8,6 +8,7 @@ the create response and echoes it back on later requests.
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from typing import Annotated
 
@@ -15,11 +16,13 @@ from fastapi import APIRouter, Header, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
 from elenchus.config import get_settings
-from elenchus.proto import llm
+from elenchus.proto import converse, llm
 from elenchus.proto.models import (
+    AskRequest,
     CheckState,
     CheckStatus,
     Claim,
+    ConversationTurn,
     CreateCheckRequest,
     GraphData,
     RunCheckRequest,
@@ -129,6 +132,34 @@ async def get_graph(check_id: str) -> GraphData:
     if check is None:
         raise HTTPException(status_code=404, detail="check not found")
     return build_graph(check)
+
+
+@router.post("/checks/{check_id}/ask")
+async def ask(check_id: str, body: AskRequest) -> EventSourceResponse:
+    """Grounded follow-up Q&A. Streams the answer token-by-token (SSE).
+
+    Answers come only from the gathered evidence/sources/text — no new search.
+    """
+    store = get_store()
+    check = store.get_check(check_id)
+    if check is None:
+        raise HTTPException(status_code=404, detail="check not found")
+
+    question = body.question.strip()
+    check.turns.append(ConversationTurn(id=uuid.uuid4().hex[:12], role="user", text=question))
+
+    async def gen():  # noqa: ANN202 - SSE generator
+        parts: list[str] = []
+        async for delta in converse.answer_stream(check, question):
+            parts.append(delta)
+            yield {"data": json.dumps({"type": "delta", "text": delta})}
+        answer = "".join(parts).strip()
+        check.turns.append(
+            ConversationTurn(id=uuid.uuid4().hex[:12], role="assistant", text=answer)
+        )
+        yield {"data": json.dumps({"type": "done"})}
+
+    return EventSourceResponse(gen())
 
 
 @router.get("/session", response_model=SessionPrefs)

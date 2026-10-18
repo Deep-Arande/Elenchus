@@ -15,6 +15,7 @@ import {
   type Language,
   type ProtoEvent,
 } from "@/lib/proto";
+import { Conversation } from "@/components/proto/conversation";
 import { GraphView } from "@/components/proto/graph-view";
 import { StatusBadge } from "@/components/proto/status-badge";
 import { StanceChip } from "@/components/proto/stance-chip";
@@ -133,13 +134,16 @@ export default function ResultPage() {
         </section>
       </div>
 
+      {/* Conversation (grounded Q&A) */}
+      {done && check && <Conversation checkId={id} seed={check.turns} />}
+
       {/* Graph */}
       <section className="mt-10">
         <h2 className="mb-3 font-serif text-lg font-semibold">Claim &amp; source graph</h2>
         <GraphView data={graph ?? { nodes: [], edges: [] }} />
         <p className="mt-2 text-xs text-muted">
-          Rounded nodes are claims; circles are sources. Edge colour + direction shows each
-          source&apos;s stance (supports / contradicts / context).
+          Drag nodes to rearrange, scroll to zoom, and use “Fit” to recentre. Arrows point from a
+          claim to the source, labelled by the source&apos;s stance.
         </p>
       </section>
 
