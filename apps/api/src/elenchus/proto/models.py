@@ -106,8 +106,17 @@ class GraphData(BaseModel):
 # --------------------------------------------------------------------------- #
 # Check + session
 # --------------------------------------------------------------------------- #
+class ConversationTurn(BaseModel):
+    """One message in the session conversation (grounded Q&A after the check)."""
+
+    id: str
+    role: Literal["user", "assistant"]
+    text: str
+    created_at: datetime = Field(default_factory=_now)
+
+
 class CheckState(BaseModel):
-    """The full in-memory state of one check."""
+    """The full in-memory state of one check (and its grounded conversation)."""
 
     id: str
     session_id: str
@@ -116,6 +125,7 @@ class CheckState(BaseModel):
     status: CheckStatus = CheckStatus.AWAITING_CONFIRMATION
     claims: list[Claim] = Field(default_factory=list)
     sources: dict[str, SourceRef] = Field(default_factory=dict)
+    turns: list[ConversationTurn] = Field(default_factory=list)
     error: str | None = None
     created_at: datetime = Field(default_factory=_now)
     mock: bool = False
@@ -151,3 +161,7 @@ class RunCheckRequest(BaseModel):
 class UpdateSessionRequest(BaseModel):
     language: Language | None = None
     strict_sources: bool | None = None
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2_000)

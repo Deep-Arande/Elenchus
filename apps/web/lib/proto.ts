@@ -44,6 +44,13 @@ export interface Claim {
   evidence: EvidenceItem[];
 }
 
+export interface ConversationTurn {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  created_at: string;
+}
+
 export interface CheckState {
   id: string;
   session_id: string;
@@ -52,6 +59,7 @@ export interface CheckState {
   status: CheckStatus;
   claims: Claim[];
   sources: Record<string, SourceRef>;
+  turns: ConversationTurn[];
   error: string | null;
   created_at: string;
   mock: boolean;
@@ -162,6 +170,61 @@ export async function updateSession(prefs: {
     headers: headers(),
     body: JSON.stringify(prefs),
   });
+}
+
+/**
+ * Ask a grounded follow-up question. Streams the answer token-by-token.
+ * Uses fetch-POST (EventSource can't POST) and parses the SSE frames manually.
+ */
+export async function askStream(
+  id: string,
+  question: string,
+  h: { onDelta: (text: string) => void; onDone?: () => void; onError?: (message: string) => void },
+): Promise<void> {
+  let finished = false;
+  const finish = () => {
+    if (!finished) {
+      finished = true;
+      h.onDone?.();
+    }
+  };
+  try {
+    const res = await fetch(`${API_BASE_URL}/proto/checks/${id}/ask`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ question }),
+    });
+    if (!res.ok || !res.body) {
+      h.onError?.(`${res.status} ${res.statusText}`);
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      // Normalise CRLF -> LF; sse_starlette separates frames with \r\n\r\n.
+      buf = (buf + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+      const frames = buf.split("\n\n");
+      buf = frames.pop() ?? "";
+      for (const frame of frames) {
+        const line = frame.split("\n").find((l) => l.startsWith("data:"));
+        if (!line) continue;
+        try {
+          const ev = JSON.parse(line.slice(5).trim()) as { type: string; text?: string };
+          if (ev.type === "delta" && ev.text) h.onDelta(ev.text);
+          else if (ev.type === "done") finish();
+        } catch {
+          /* ignore malformed frame */
+        }
+      }
+    }
+  } catch (e) {
+    h.onError?.(e instanceof Error ? e.message : "stream error");
+  } finally {
+    finish();
+  }
 }
 
 /**

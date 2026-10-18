@@ -6,6 +6,8 @@ Business logic lives in the feature packages (AGENTS.md section 4).
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,6 +17,17 @@ from elenchus.proto.router import router as proto_router
 from elenchus.routers import health
 
 
+def _configure_logging() -> None:
+    """Make ``elenchus.*`` logs visible on stderr regardless of uvicorn config."""
+    lg = logging.getLogger("elenchus")
+    lg.setLevel(logging.INFO)
+    if not lg.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+        lg.addHandler(handler)
+        lg.propagate = False
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build and return the FastAPI app.
 
@@ -22,6 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     touching the environment.
     """
     settings = settings or get_settings()
+    _configure_logging()
 
     app = FastAPI(
         title="Elenchus API",
